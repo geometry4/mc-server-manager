@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
     QApplication,
+    QCheckBox,
     QFrame,
     QGraphicsDropShadowEffect,
     QGridLayout,
@@ -22,6 +24,7 @@ from PyQt5.QtWidgets import (
 from .config import DEFAULT_SERVER_ROOT, ServerConfig
 from .logs import LogTailer
 from .process import ServerProcessManager
+from .settings import DEFAULT_SETTINGS_PATH, load_settings, save_settings, Settings
 from .theme import build_stylesheet, status_color
 from .view_model import ServerManagerViewModel, UiState
 
@@ -129,9 +132,14 @@ def _button(text: str, kind: str) -> QPushButton:
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, view_model: ServerManagerViewModel):
+    def __init__(
+        self,
+        view_model: ServerManagerViewModel,
+        settings_path: Path | str | None = None,
+    ):
         super().__init__()
         self.view_model = view_model
+        self.settings_path = Path(settings_path) if settings_path else DEFAULT_SETTINGS_PATH
         self.status_color = status_color("stopped")
 
         self.setWindowTitle("Minecraft 服务器管理")
@@ -179,6 +187,13 @@ class MainWindow(QMainWindow):
         self.force_button = _button("强制停止", "danger")
         self.refresh_button = _button("刷新", "secondary")
 
+        self.auto_start_checkbox = QCheckBox("登录时自动启动服务端")
+        self.auto_start_checkbox.setCursor(Qt.PointingHandCursor)
+        self.auto_start_checkbox.setChecked(load_settings(self.settings_path).auto_start_server)
+        if hasattr(view_model, "auto_start_enabled"):
+            view_model.auto_start_enabled = self.auto_start_checkbox.isChecked()
+        self.auto_start_checkbox.toggled.connect(self._on_auto_start_toggled)
+
         self.start_button.clicked.connect(self.on_start)
         self.stop_button.clicked.connect(self.on_request_stop)
         self.force_button.clicked.connect(self.on_force_stop)
@@ -211,6 +226,7 @@ class MainWindow(QMainWindow):
 
         buttons = QHBoxLayout()
         buttons.setSpacing(10)
+        buttons.addWidget(self.auto_start_checkbox)
         buttons.addStretch(1)
         buttons.addWidget(self.refresh_button)
         buttons.addWidget(self.force_button)
@@ -268,6 +284,13 @@ class MainWindow(QMainWindow):
     def refresh_state(self) -> None:
         self.apply_state(self.view_model.refresh())
 
+    def _on_auto_start_toggled(self, checked: bool) -> None:
+        settings = load_settings(self.settings_path)
+        settings.auto_start_server = bool(checked)
+        save_settings(settings, self.settings_path)
+        if hasattr(self.view_model, "auto_start_enabled"):
+            self.view_model.auto_start_enabled = bool(checked)
+
     def on_start(self) -> None:
         self.apply_state(self.view_model.start())
 
@@ -305,9 +328,17 @@ class MainWindow(QMainWindow):
 def main() -> int:
     app = QApplication(sys.argv)
     config = ServerConfig.load(DEFAULT_SERVER_ROOT)
+    settings = load_settings()
     process_manager = ServerProcessManager(config)
     log_tailer = LogTailer(config.latest_log_path)
-    view_model = ServerManagerViewModel(config, process_manager, log_tailer)
-    window = MainWindow(view_model)
+    view_model = ServerManagerViewModel(
+        config,
+        process_manager,
+        log_tailer,
+        auto_start_enabled=settings.auto_start_server,
+    )
+    window = MainWindow(view_model, settings_path=DEFAULT_SETTINGS_PATH)
     window.show()
+    if settings.auto_start_server:
+        window.apply_state(view_model.maybe_auto_start())
     return app.exec_()

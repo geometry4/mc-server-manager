@@ -169,3 +169,36 @@ def test_unexpected_exit_reports_crashed(tmp_path, monkeypatch):
     state = vm.refresh()
 
     assert state.state == "crashed"
+
+
+def test_maybe_auto_start_starts_when_enabled_and_stopped(tmp_path, monkeypatch):
+    patch_status(monkeypatch, listening=False)
+    vm, process = make_vm(tmp_path)
+    vm.auto_start_enabled = True
+
+    state = vm.maybe_auto_start()
+
+    assert process.started is True
+    assert state.state == "starting"
+
+
+def test_maybe_auto_start_does_nothing_when_disabled(tmp_path, monkeypatch):
+    patch_status(monkeypatch, listening=False)
+    vm, process = make_vm(tmp_path)
+    vm.auto_start_enabled = False
+
+    state = vm.maybe_auto_start()
+
+    assert process.started is False
+    assert state.state == "stopped"
+
+
+def test_maybe_auto_start_does_not_touch_external_server(tmp_path, monkeypatch):
+    patch_status(monkeypatch, listening=True)
+    vm, process = make_vm(tmp_path)
+    vm.auto_start_enabled = True
+
+    state = vm.maybe_auto_start()
+
+    assert process.started is False
+    assert state.state == "unknown-external-process"

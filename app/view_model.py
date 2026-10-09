@@ -29,10 +29,12 @@ class ServerManagerViewModel:
         config: ServerConfig,
         process_manager: ServerProcessManager,
         log_tailer: LogTailer,
+        auto_start_enabled: bool = False,
     ):
         self.config = config
         self.process_manager = process_manager
         self.log_tailer = log_tailer
+        self.auto_start_enabled = auto_start_enabled
         self._message = ""
         self._saw_done = False
         self._stopping = False
@@ -121,4 +123,9 @@ class ServerManagerViewModel:
             self._stopping = False
             self._started = False
             self._saw_done = False
+        return self.refresh()
+
+    def maybe_auto_start(self) -> UiState:
+        if self.auto_start_enabled and self.refresh().state == "stopped":
+            return self.start()
         return self.refresh()

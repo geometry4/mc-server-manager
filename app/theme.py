@@ -177,6 +177,29 @@ QPushButton[kind="danger"]:disabled {{
     color: #a1a1a6;
 }}
 
+QCheckBox {{
+    spacing: 9px;
+    font-size: 13px;
+    color: {TEXT_PRIMARY};
+}}
+
+QCheckBox::indicator {{
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.20);
+    background-color: {CARD};
+}}
+
+QCheckBox::indicator:hover {{
+    border-color: rgba(0, 0, 0, 0.32);
+}}
+
+QCheckBox::indicator:checked {{
+    background-color: {ACCENT};
+    border-color: {ACCENT};
+}}
+
 QPlainTextEdit#LogView {{
     background-color: {LOG_BACKGROUND};
     color: {LOG_TEXT};
